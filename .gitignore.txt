@@ -1,0 +1,28 @@
+.gitignore
+# Raw & processed imaging video files
+*.sbx
+*.mat
+*.h5
+*.hdf5
+*.bin
+*.tif
+*.tiff
+
+# Suite2p numpy arrays and output folders
+*.npy
+suite2p/
+plane*/
+
+# Python / Conda / Environments
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+env/
+envs/
+
+# Operating system / IDE metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+EOF
