@@ -12,8 +12,9 @@ if str2double(matlab_release(1:4)) < 2022
 end
 
 %% 2. Paths & Environment Setup
-patchwarp_code_dir = 'C:\Users\Jacob\Documents\dadarlat_labs\external\PatchWarp';
-input_dir          = 'C:\Users\Jacob\Documents\patchwarp_prep';
+repo_root          = 'C:\Users\jacob\Documents\dadarlat_labs';
+patchwarp_code_dir = fullfile(repo_root, 'external', 'PatchWarp', 'PatchWarp');
+input_dir          = fullfile(repo_root, 'data', 'mouse_6416_1R1L', 'patchwarp_prep');
 output_dir         = fullfile(input_dir, 'patchwarp_results');
 
 if ~exist(output_dir, 'dir')
