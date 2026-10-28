@@ -1,36 +1,32 @@
 # Dadarlat Labs Monorepo
 
-Repository for 2-photon calcium imaging pipelines, Scanbox acquisition utilities, and intracortical microstimulation (ICMS) analysis.
+Repository for 2-photon calcium imaging pipelines, Scanbox acquisition utilities, longitudinal registration, and intracortical microstimulation (ICMS) neural response analysis.
 
 ---
 
 ## Documentation & Literature Reviews
 
-* **[Review of 2-Photon Microscopy in vivo Calcium Imaging Studies](docs/2P_Calcium_Imaging_Lit_Review.pdf)**[cite: 2]
-  * **Author:** Jake G. Gilpin (Dadarlat Labs, Weldon School of Biomedical Engineering, Purdue University)[cite: 2]
+* **[Review of 2-Photon Microscopy in vivo Calcium Imaging Studies](docs/2P_Calcium_Imaging_Lit_Review.pdf)**
+  * **Author:** Jake G. Gilpin (Dadarlat Labs, Weldon School of Biomedical Engineering, Purdue University)
   * **Topics Covered:** 
-    * Spatiotemporal dynamics of excitatory vs. inhibitory cortical recruitment under ICMS[cite: 3].
-    * Spike deconvolution algorithms (OASIS vs. CNNs vs. NND)[cite: 6, 7].
-    * Suite2p processing architecture and PatchWarp non-rigid distortion correction[cite: 8, 10].
-    * Methodological confounds: ATP-depleted Ca2+ clearance failure, hemodynamic absorption, vascular tissue warping, and inter-trial carry-over[cite: 15, 16, 17, 18].
-    * Scanbox volumetric ETL imaging and closed-loop Z-drift stabilization[cite: 13].
+    * Spatiotemporal dynamics of excitatory vs. inhibitory cortical recruitment under ICMS.
+    * Spike deconvolution algorithms (OASIS vs. CNNs vs. NND).
+    * Suite2p processing architecture and PatchWarp non-rigid distortion correction.
+    * Methodological confounds: ATP-depleted Ca2+ clearance failure, hemodynamic absorption, vascular tissue warping, and inter-trial carry-over.
+    * Scanbox volumetric ETL imaging and closed-loop Z-drift stabilization.
 
 ---
 
-## Suite2p to PatchWarp Pipeline
+## Pipeline Architecture & Workflow
 
-This pipeline automatically extracts Suite2p templates and ROI masks, bridges them to MATLAB, and runs PatchWarp's across-session affine registration to correct longitudinal tissue drift.
+The repository is modularized into sequential pipelines to cleanly separate data ingestion, spatial alignment, and downstream neuroscience analysis:
 
-### 1. Prerequisites
-* **Python:** Miniforge3 `suite2p` conda environment (see `pipelines/suite2p_patchwarp/environment.yml`)[cite: 1].
-* **MATLAB:** MATLAB R2022b (requires Image Processing, Parallel Computing, Signal Processing, and Statistics toolboxes).
-* **PatchWarp:** Ensure the submodule is cloned into `external/PatchWarp`.
-
-### 2. Directory Structure
-Ensure your raw data is organized inside the `data/` folder (which is ignored by Git to prevent tracking massive binaries):
 ```text
-data/
-└── mouse_6416_1R1L/
-    ├── day_1/suite2p/plane0/
-    ├── day_2/suite2p/plane0/
-    └── day_3/suite2p/plane0/
+dadarlat_labs/
+└── pipelines/
+    ├── core/                         # Shared mathematical/utility functions
+    ├── preprocessing/                # Stage 0: Scanbox .sbx -> .h5 conversion
+    └── multi_day_alignment/          
+        ├── run_suite2p_patchwarp.py  # Stage 1: Alignment Orchestrator
+        ├── suite2p_patchwarp/        # Backend Python/MATLAB registration engine
+        └── analysis/                 # Stage 2: Post-alignment visualizers & metrics
