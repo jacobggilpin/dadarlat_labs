@@ -1,6 +1,9 @@
 """
 visualize_longitudinal_cells.py
-Optimized, low-latency interactive explorer for Suite2p + PatchWarp tracked neurons.
+Interactive viewer and longitudinal analysis tool for Suite2p + PatchWarp tracked neurons.
+
+Usage (One-Line Command from Repository Root):
+    python pipelines\\suite2p_patchwarp\\scripts\\visualize_longitudinal_cells.py --mouse mouse_6416_1R1L --fs 15.625
 
 Key Optimizations:
   - Artist data-updating (set_data / set_ydata) instead of ax.clear() for <15ms navigation
