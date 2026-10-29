@@ -1,5 +1,4 @@
-<img width="193" height="20" alt="image" src="https://github.com/user-attachments/assets/c42934d4-3c28-446b-a0ae-52544c3dec66" />
-
+[![DOI](https://zenodo.org/badge/1436417760.svg)](https://doi.org/10.5281/zenodo.23768836)
 
 # Dadarlat Labs Monorepo
 
