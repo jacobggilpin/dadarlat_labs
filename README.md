@@ -1,3 +1,6 @@
+<img width="193" height="20" alt="image" src="https://github.com/user-attachments/assets/c42934d4-3c28-446b-a0ae-52544c3dec66" />
+
+
 # Dadarlat Labs Monorepo
 
 Repository for 2-photon calcium imaging pipelines, Scanbox acquisition utilities, longitudinal registration, and intracortical microstimulation (ICMS) neural response analysis.
