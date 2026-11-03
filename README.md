@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1436417760.svg)](https://doi.org/10.5281/zenodo.23768836)
+
 # Dadarlat Labs Monorepo
 
 Repository for 2-photon calcium imaging pipelines, Scanbox acquisition utilities, longitudinal registration, and intracortical microstimulation (ICMS) neural response analysis.
