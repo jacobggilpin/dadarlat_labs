@@ -20,9 +20,16 @@ end
 
 %% 2. Configure Directories & Add PatchWarp to Path
 patchwarp_code_dir = fullfile(repo_root, 'external', 'PatchWarp', 'PatchWarp');
-mouse_dir          = fullfile(repo_root, 'data', mouse_id);
-input_dir          = fullfile(mouse_dir, 'patchwarp_prep');
-output_dir         = fullfile(mouse_dir, 'patchwarp_results');
+
+if ~exist('run_name', 'var')
+    run_name = 'run_01_provided';
+end
+if ~exist('input_dir', 'var')
+    input_dir = fullfile(repo_root, 'data', mouse_id, 'multi_day_results', run_name, 'patchwarp_prep');
+end
+if ~exist('output_dir', 'var')
+    output_dir = fullfile(repo_root, 'data', mouse_id, 'multi_day_results', run_name, 'patchwarp_results');
+end
 
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);

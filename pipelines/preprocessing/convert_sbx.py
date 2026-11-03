@@ -3,7 +3,7 @@ convert_sbx.py
 Converts Scanbox (.sbx) two-photon imaging files into HDF5 format for Suite2p ingestion.
 
 Usage:
-    python pipelines/suite2p_patchwarp/scripts/convert_sbx.py --input data/mouse_6416_1R1L/day_1/6416_1R1L_000_000.sbx --output data/mouse_6416_1R1L/day_1/6416_1R1L_000_000.h5 --fs 15.625
+    python pipelines\preprocessing\convert_sbx.py --input data\mouse_6416_1R1L\day_2\6416_1R1L_000_000.sbx --output data\mouse_6416_1R1L\day_2\6416_1R1L_000_000.h5 --fs 15.625
 """
 
 import argparse
