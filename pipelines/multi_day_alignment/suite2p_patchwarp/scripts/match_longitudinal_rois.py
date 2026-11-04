@@ -192,14 +192,37 @@ def match_across_sessions(
     np.save(traces_out_path, compiled_traces)
     print(f"Saved compiled multi-day traces: {traces_out_path.name}")
 
-    num_axes = len(days) + 1
-    fig, axes = plt.subplots(1, num_axes, figsize=(6 * num_axes, 6))
-    
-    for ax in axes:
-        ax.imshow(target_mean_img, cmap="gray", vmin=np.percentile(target_mean_img, 1), vmax=np.percentile(target_mean_img, 99))
-        ax.axis("off")
-
     colors = ["#00FF66", "#FF3399", "#00CCFF", "#FFCC00"]
+    vmin = np.percentile(target_mean_img, 1)
+    vmax = np.percentile(target_mean_img, 99)
+
+    # 1. Generate and save INDIVIDUAL plots for each day
+    for i, d in enumerate(days):
+        c = colors[i % len(colors)]
+        fig, ax = plt.subplots(figsize=(6, 6))
+        
+        ax.imshow(target_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
+        ax.axis("off")
+        
+        masks_d = session_data[d]["masks"]
+        local_indices = df_tracked_all[f"{d}_local_idx"].values.astype(int)
+        
+        if len(local_indices) > 0:
+            combined_contour = np.max(masks_d[local_indices], axis=0)
+            ax.contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
+            
+        ax.set_title(f"{d} Tracked (n={n_tracked})", fontsize=12, color=c)
+        plt.tight_layout()
+        
+        fig_path = results_dir / f"qc_matched_rois_{d}.png"
+        plt.savefig(fig_path, dpi=200)
+        plt.close(fig)
+        print(f"Saved individual ROI map: {fig_path.name}")
+
+    # 2. Generate and save the COMBINED plot
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(target_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
+    ax.axis("off")
     
     for i, d in enumerate(days):
         c = colors[i % len(colors)]
@@ -208,22 +231,21 @@ def match_across_sessions(
         
         if len(local_indices) > 0:
             combined_contour = np.max(masks_d[local_indices], axis=0)
-            
-            axes[i].contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
-            axes[-1].contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
-            
-        axes[i].set_title(f"{d} Tracked (n={n_tracked})", fontsize=12, color=c)
-        axes[-1].plot([], [], color=c, label=f"{d} (n={n_tracked})")
+            ax.contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
+        
+        # Add empty plot line just for the legend
+        ax.plot([], [], color=c, label=f"{d} (n={n_tracked})")
 
-    axes[-1].set_title(f"All Sessions Combined (n = {n_tracked})", fontsize=12)
-    axes[-1].legend(loc="upper right", framealpha=0.85)
+    ax.set_title(f"All Sessions Combined (n = {n_tracked})", fontsize=12)
     
+    # Shrink legend font and marker size so it stops blocking data
+    ax.legend(loc="upper right", framealpha=0.85, fontsize=8, handlelength=1.5)
     plt.tight_layout()
-
-    fig_path = results_dir / "qc_matched_rois_panels.png"
-    plt.savefig(fig_path, dpi=200)
+    
+    combined_fig_path = results_dir / "qc_matched_rois_combined.png"
+    plt.savefig(combined_fig_path, dpi=200)
     plt.close(fig)
-    print(f"Saved multi-panel ROI contour map: {fig_path.name}")
+    print(f"Saved combined ROI map: {combined_fig_path.name}")
 
 
 if __name__ == "__main__":
