@@ -95,7 +95,8 @@ def match_across_sessions(
         target_mean_img = np.transpose(np.array(f["target_meanImg"]), (1, 0))
         session_data[target_day] = {
             "masks": target_masks,
-            "suite2p_indices": target_indices
+            "suite2p_indices": target_indices,
+            "mean_img": target_mean_img
         }
 
         for s_day in source_days:
@@ -103,9 +104,11 @@ def match_across_sessions(
                 raise KeyError(f"Group '{s_day}' not found in {mat_path.name}")
             grp = f[s_day]
             s_masks, s_indices = load_hdf5_masks_and_indices(grp, "warped_masks", "roi_indices")
+            s_mean_img = np.transpose(np.array(grp["warped_meanImg"]), (1, 0))
             session_data[s_day] = {
                 "masks": s_masks,
-                "suite2p_indices": s_indices
+                "suite2p_indices": s_indices,
+                "mean_img": s_mean_img
             }
 
     Nt = len(target_indices)
@@ -172,7 +175,6 @@ def match_across_sessions(
     }
 
     for d in days:
-        # FIX: Removed the extra "runs" folder to match user's actual directory structure
         plane0 = mouse_dir / d / run_name / "suite2p" / "plane0"
         F = np.load(plane0 / "F.npy", allow_pickle=True)
         Fneu = np.load(plane0 / "Fneu.npy", allow_pickle=True)
@@ -193,15 +195,17 @@ def match_across_sessions(
     print(f"Saved compiled multi-day traces: {traces_out_path.name}")
 
     colors = ["#00FF66", "#FF3399", "#00CCFF", "#FFCC00"]
-    vmin = np.percentile(target_mean_img, 1)
-    vmax = np.percentile(target_mean_img, 99)
 
-    # 1. Generate and save INDIVIDUAL plots for each day
+    # 1. Generate and save INDIVIDUAL plots for each day using the day's specific mean image
     for i, d in enumerate(days):
         c = colors[i % len(colors)]
         fig, ax = plt.subplots(figsize=(6, 6))
         
-        ax.imshow(target_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
+        day_mean_img = session_data[d]["mean_img"]
+        vmin = np.percentile(day_mean_img, 1)
+        vmax = np.percentile(day_mean_img, 99)
+        
+        ax.imshow(day_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
         ax.axis("off")
         
         masks_d = session_data[d]["masks"]
@@ -219,13 +223,22 @@ def match_across_sessions(
         plt.close(fig)
         print(f"Saved individual ROI map: {fig_path.name}")
 
-    # 2. Generate and save the COMBINED plot
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.imshow(target_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
-    ax.axis("off")
-    
+    # 2. Generate and save the MULTI-PANEL plot (matched_rois_panels.png)
+    fig_panels, axes = plt.subplots(1, len(days), figsize=(5 * len(days), 5))
+    if len(days) == 1:
+        axes = [axes]
+        
     for i, d in enumerate(days):
+        ax = axes[i]
         c = colors[i % len(colors)]
+        
+        day_mean_img = session_data[d]["mean_img"]
+        vmin = np.percentile(day_mean_img, 1)
+        vmax = np.percentile(day_mean_img, 99)
+        
+        ax.imshow(day_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
+        ax.axis("off")
+        
         masks_d = session_data[d]["masks"]
         local_indices = df_tracked_all[f"{d}_local_idx"].values.astype(int)
         
@@ -233,19 +246,13 @@ def match_across_sessions(
             combined_contour = np.max(masks_d[local_indices], axis=0)
             ax.contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
         
-        # Add empty plot line just for the legend
-        ax.plot([], [], color=c, label=f"{d} (n={n_tracked})")
+        ax.set_title(f"{d} (n={n_tracked})", fontsize=12, color=c)
 
-    ax.set_title(f"All Sessions Combined (n = {n_tracked})", fontsize=12)
-    
-    # Shrink legend font and marker size so it stops blocking data
-    ax.legend(loc="upper right", framealpha=0.85, fontsize=8, handlelength=1.5)
     plt.tight_layout()
-    
-    combined_fig_path = results_dir / "qc_matched_rois_combined.png"
-    plt.savefig(combined_fig_path, dpi=200)
-    plt.close(fig)
-    print(f"Saved combined ROI map: {combined_fig_path.name}")
+    panels_fig_path = results_dir / "matched_rois_panels.png"
+    plt.savefig(panels_fig_path, dpi=200)
+    plt.close(fig_panels)
+    print(f"Saved multi-panel ROI map: {panels_fig_path.name}")
 
 
 if __name__ == "__main__":
