@@ -11,7 +11,7 @@ import numpy as np
 import scipy.io as sio
 
 
-def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str, only_cells: bool = True):
+def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str, only_cells: bool = True, align_img_key: str = "meanImg"):
     """
     Parses a single suite2p plane0 directory and saves a clean .mat file for PatchWarp.
     """
@@ -32,6 +32,14 @@ def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str,
 
     Ly = int(ops["Ly"])
     Lx = int(ops["Lx"])
+
+    # Dynamically select the alignment image (fallback to meanImg if missing)
+    if align_img_key in ops:
+        align_img = ops[align_img_key].astype(np.float32)
+    else:
+        print(f"Warning: {align_img_key} not found. Falling back to meanImg.")
+        align_img = ops["meanImg"].astype(np.float32)
+
     mean_img = ops["meanImg"].astype(np.float32)
     mean_img_e = ops.get("meanImgE", mean_img).astype(np.float32)
 
@@ -45,7 +53,6 @@ def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str,
     print(f"Found {len(stat)} total ROIs. Selected {n_rois} ROIs for alignment.")
 
     # 3. Construct 2D coordinate lists & 3D binary footprint tensor (Ly, Lx, N)
-    # PatchWarp can ingest spatial footprints directly as masks or 2D centroids
     roi_masks = np.zeros((Ly, Lx, n_rois), dtype=np.uint8)
     centroids = np.zeros((n_rois, 2), dtype=np.float32)  # [y, x]
     roi_pixel_lists = []
@@ -64,6 +71,8 @@ def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str,
         "session_name": session_name,
         "Ly": Ly,
         "Lx": Lx,
+        "alignImg": align_img,
+        "alignImgKey": align_img_key,
         "meanImg": mean_img,
         "meanImgE": mean_img_e,
         "centroids": centroids,
@@ -79,32 +88,19 @@ def process_suite2p_session(session_dir: Path, out_dir: Path, session_name: str,
 
 def main():
     parser = argparse.ArgumentParser(description="Export Suite2p outputs for PatchWarp across-session registration.")
+    parser.add_argument("--sessions", nargs="+", required=True, help="Paths to session directories")
+    parser.add_argument("--names", nargs="+", default=["day1", "day2", "day3"], help="Names for each session")
+    parser.add_argument("--out_dir", type=str, default="./patchwarp_inputs", help="Target folder")
+    parser.add_argument("--all_rois", action="store_true", help="Include all detected ROIs")
     parser.add_argument(
-        "--sessions",
-        nargs="+",
-        required=True,
-        help="Paths to your 3 day session directories (e.g. C:/data/day1 C:/data/day2 C:/data/day3)"
-    )
-    parser.add_argument(
-        "--names",
-        nargs="+",
-        default=["day1", "day2", "day3"],
-        help="Identifier names for each session"
-    )
-    parser.add_argument(
-        "--out_dir",
+        "--align_img",
         type=str,
-        default="./patchwarp_inputs",
-        help="Target folder for export files"
-    )
-    parser.add_argument(
-        "--all_rois",
-        action="store_true",
-        help="Include all detected ROIs instead of only iscell==1"
+        default="meanImg",
+        choices=["meanImg", "meanImgE", "max_proj"],
+        help="Suite2p ops key to use for registration (default: meanImg)"
     )
 
     args = parser.parse_args()
-
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -112,7 +108,7 @@ def main():
         raise ValueError("Number of session paths must match number of session names.")
 
     for s_path, s_name in zip(args.sessions, args.names):
-        process_suite2p_session(Path(s_path), out_dir, s_name, only_cells=not args.all_rois)
+        process_suite2p_session(Path(s_path), out_dir, s_name, only_cells=not args.all_rois, align_img_key=args.align_img)
 
     print("\n✓ All session summary files successfully exported for PatchWarp.")
 

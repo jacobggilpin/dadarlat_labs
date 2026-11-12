@@ -1,9 +1,3 @@
-"""
-match_longitudinal_rois.py
-Matches warped ROI spatial footprints across longitudinal sessions using IoU
-and centroid distance via the Hungarian algorithm, then links Suite2p neural traces.
-"""
-
 import argparse
 from pathlib import Path
 import h5py
@@ -12,7 +6,6 @@ import pandas as pd
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
-
 
 def load_hdf5_masks_and_indices(h5_group, mask_key, idx_key):
     raw_masks = np.array(h5_group[mask_key])
@@ -26,7 +19,6 @@ def load_hdf5_masks_and_indices(h5_group, mask_key, idx_key):
     indices = np.array(h5_group[idx_key]).flatten().astype(int) - 1
     return masks, indices
 
-
 def compute_centroids(masks):
     N = masks.shape[0]
     centroids = np.zeros((N, 2), dtype=np.float32)
@@ -38,7 +30,6 @@ def compute_centroids(masks):
         else:
             centroids[i] = [-1000.0, -1000.0]
     return centroids
-
 
 def match_session_pair(target_masks, source_masks, iou_thresh=0.25, max_dist=12.0):
     Nt = target_masks.shape[0]
@@ -53,7 +44,6 @@ def match_session_pair(target_masks, source_masks, iou_thresh=0.25, max_dist=12.
     union = t_areas + s_areas - intersection
 
     iou_matrix = np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)
-
     t_cent = compute_centroids(target_masks)
     s_cent = compute_centroids(source_masks)
     dist_matrix = cdist(t_cent, s_cent, metric="euclidean")
@@ -71,16 +61,15 @@ def match_session_pair(target_masks, source_masks, iou_thresh=0.25, max_dist=12.
 
     return matches
 
-
 def match_across_sessions(
     mouse_dir: Path,
     days: list,
     target_day: str,
     run_name: str,
+    results_dir: Path,
     iou_thresh: float = 0.25,
     max_dist: float = 12.0
 ):
-    results_dir = mouse_dir / "multi_day_results" / run_name / "patchwarp_results"
     mat_path = results_dir / "across_sessions_patchwarp_results.mat"
 
     if not mat_path.exists():
@@ -92,23 +81,21 @@ def match_across_sessions(
 
     with h5py.File(mat_path, "r") as f:
         target_masks, target_indices = load_hdf5_masks_and_indices(f, "target_masks", "target_indices")
-        target_mean_img = np.transpose(np.array(f["target_meanImg"]), (1, 0))
+        target_align_img = np.transpose(np.array(f["target_alignImg"]), (1, 0))
         session_data[target_day] = {
             "masks": target_masks,
             "suite2p_indices": target_indices,
-            "mean_img": target_mean_img
+            "mean_img": target_align_img
         }
 
         for s_day in source_days:
-            if s_day not in f:
-                raise KeyError(f"Group '{s_day}' not found in {mat_path.name}")
             grp = f[s_day]
             s_masks, s_indices = load_hdf5_masks_and_indices(grp, "warped_masks", "roi_indices")
-            s_mean_img = np.transpose(np.array(grp["warped_meanImg"]), (1, 0))
+            s_align_img = np.transpose(np.array(grp["warped_alignImg"]), (1, 0))
             session_data[s_day] = {
                 "masks": s_masks,
                 "suite2p_indices": s_indices,
-                "mean_img": s_mean_img
+                "mean_img": s_align_img
             }
 
     Nt = len(target_indices)
@@ -154,7 +141,6 @@ def match_across_sessions(
         df[f"{s_day}_suite2p_id"] = s_s2p_col
         df[f"{s_day}_iou"] = iou_col
         df[f"{s_day}_dist_px"] = dist_col
-        print(f"  -> Matched {len(matches)} cells between {s_day} and {target_day}.")
 
     s2p_cols = [f"{d}_suite2p_id" for d in days]
     tracked_all_mask = (df[s2p_cols] != -1).all(axis=1)
@@ -175,6 +161,7 @@ def match_across_sessions(
     }
 
     for d in days:
+        # PULL FROM RAW RUN_NAME
         plane0 = mouse_dir / d / run_name / "suite2p" / "plane0"
         F = np.load(plane0 / "F.npy", allow_pickle=True)
         Fneu = np.load(plane0 / "Fneu.npy", allow_pickle=True)
@@ -192,77 +179,56 @@ def match_across_sessions(
 
     traces_out_path = results_dir / "matched_longitudinal_traces.npy"
     np.save(traces_out_path, compiled_traces)
-    print(f"Saved compiled multi-day traces: {traces_out_path.name}")
 
     colors = ["#00FF66", "#FF3399", "#00CCFF", "#FFCC00"]
-
-    # 1. Generate and save INDIVIDUAL plots for each day using the day's specific mean image
     for i, d in enumerate(days):
         c = colors[i % len(colors)]
         fig, ax = plt.subplots(figsize=(6, 6))
         
         day_mean_img = session_data[d]["mean_img"]
-        vmin = np.percentile(day_mean_img, 1)
-        vmax = np.percentile(day_mean_img, 99)
-        
+        vmin, vmax = np.percentile(day_mean_img, [1, 99])
         ax.imshow(day_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
         ax.axis("off")
         
         masks_d = session_data[d]["masks"]
         local_indices = df_tracked_all[f"{d}_local_idx"].values.astype(int)
-        
         if len(local_indices) > 0:
-            combined_contour = np.max(masks_d[local_indices], axis=0)
-            ax.contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
+            ax.contour(np.max(masks_d[local_indices], axis=0), levels=[0.5], colors=[c], linewidths=1.0)
             
         ax.set_title(f"{d} Tracked (n={n_tracked})", fontsize=12, color=c)
         plt.tight_layout()
-        
-        fig_path = results_dir / f"qc_matched_rois_{d}.png"
-        plt.savefig(fig_path, dpi=200)
+        plt.savefig(results_dir / f"qc_matched_rois_{d}.png", dpi=200)
         plt.close(fig)
-        print(f"Saved individual ROI map: {fig_path.name}")
 
-    # 2. Generate and save the MULTI-PANEL plot (matched_rois_panels.png)
     fig_panels, axes = plt.subplots(1, len(days), figsize=(5 * len(days), 5))
-    if len(days) == 1:
-        axes = [axes]
+    if len(days) == 1: axes = [axes]
         
     for i, d in enumerate(days):
         ax = axes[i]
         c = colors[i % len(colors)]
-        
         day_mean_img = session_data[d]["mean_img"]
-        vmin = np.percentile(day_mean_img, 1)
-        vmax = np.percentile(day_mean_img, 99)
-        
+        vmin, vmax = np.percentile(day_mean_img, [1, 99])
         ax.imshow(day_mean_img, cmap="gray", vmin=vmin, vmax=vmax)
         ax.axis("off")
-        
         masks_d = session_data[d]["masks"]
         local_indices = df_tracked_all[f"{d}_local_idx"].values.astype(int)
-        
         if len(local_indices) > 0:
-            combined_contour = np.max(masks_d[local_indices], axis=0)
-            ax.contour(combined_contour, levels=[0.5], colors=[c], linewidths=1.0)
-        
+            ax.contour(np.max(masks_d[local_indices], axis=0), levels=[0.5], colors=[c], linewidths=1.0)
         ax.set_title(f"{d} (n={n_tracked})", fontsize=12, color=c)
 
     plt.tight_layout()
-    panels_fig_path = results_dir / "matched_rois_panels.png"
-    plt.savefig(panels_fig_path, dpi=200)
+    plt.savefig(results_dir / "matched_rois_panels.png", dpi=200)
     plt.close(fig_panels)
-    print(f"Saved multi-panel ROI map: {panels_fig_path.name}")
-
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Match warped Suite2p ROIs across sessions")
-    parser.add_argument("--mouse_dir", type=str, required=True, help="Path to mouse folder (e.g. data/mouse_6416_1R1L)")
-    parser.add_argument("--days", nargs="+", default=["day_1", "day_2", "day_3"], help="List of session days")
-    parser.add_argument("--target", type=str, default="day_2", help="Target session name")
-    parser.add_argument("--run_name", type=str, required=True, help="Target run folder (e.g., run_01_provided)")
-    parser.add_argument("--iou_thresh", type=float, default=0.25, help="Minimum IoU overlap threshold (default: 0.25)")
-    parser.add_argument("--max_dist", type=float, default=12.0, help="Max centroid distance in pixels (default: 12.0)")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mouse_dir", type=str, required=True)
+    parser.add_argument("--days", nargs="+", default=["day_1", "day_2", "day_3"])
+    parser.add_argument("--target", type=str, default="day_2")
+    parser.add_argument("--run_name", type=str, required=True)
+    parser.add_argument("--results_dir", type=str, required=True)
+    parser.add_argument("--iou_thresh", type=float, default=0.25)
+    parser.add_argument("--max_dist", type=float, default=12.0)
     args = parser.parse_args()
 
     match_across_sessions(
@@ -270,6 +236,7 @@ if __name__ == "__main__":
         args.days,
         args.target,
         args.run_name,
+        Path(args.results_dir).resolve(),
         iou_thresh=args.iou_thresh,
         max_dist=args.max_dist
     )
